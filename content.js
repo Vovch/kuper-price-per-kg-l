@@ -1,10 +1,10 @@
 // Function to parse weight/volume from text
 function parseAmount(text) {
-    const match = text.match(/(\d+(?:\.\d+)?)\s*(г|мл|кг|л)/i);
+    const match = text.match(/(\d+(?:[.,]\d+)?)\s*(г|мл|кг|л)/i);
     if (!match) return null;
 
     let [_, amount, unit] = match;
-    amount = parseFloat(amount);
+    amount = parseFloat(amount.replace(',', '.'));
     unit = unit.toLowerCase();
 
     // Convert to kg/l
