@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Kuper Price Calculator",
+  "version": "1.0",
+  "description": "Adds price per kilogram/liter information to products on kuper.ru",
+  "permissions": [
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.kuper.ru/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
