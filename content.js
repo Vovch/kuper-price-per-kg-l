@@ -1,5 +1,6 @@
 // Function to parse weight/volume from text
 function parseAmount(text) {
+    // Try to match amount with unit
     const match = text.match(/(\d+(?:[.,]\d+)?)\s*(г|мл|кг|л)/i);
     if (!match) return null;
 
@@ -27,6 +28,26 @@ function parsePrice(text) {
     return match ? parseFloat(match[1]) : null;
 }
 
+// Function to parse price per unit from volume text
+function parsePricePerUnit(text) {
+    // Try to match pattern like "446,99 ₽ за 1 кг"
+    const match = text.match(/(\d+(?:[.,]\d+)?)\s*₽\s+за\s+(?:\d+(?:[.,]\d+)?)\s*(г|мл|кг|л)/i);
+    if (!match) return null;
+
+    let [_, price, unit] = match;
+    price = parseFloat(price.replace(',', '.'));
+    unit = unit.toLowerCase();
+
+    // Convert to kg/l if needed
+    if (unit === 'г') {
+        unit = 'кг';
+    } else if (unit === 'мл') {
+        unit = 'л';
+    }
+
+    return { price, unit };
+}
+
 // Function to add price per kg/l to a product card
 function addPricePerUnit(card) {
     // Check if we already processed this card
@@ -36,36 +57,51 @@ function addPricePerUnit(card) {
     const volumeEl = card.querySelector('[data-qa$="_volume"]');
     if (!volumeEl) return;
 
-    // Find price element - first try discounted price, then regular price
-    let priceEl = card.querySelector('[class*=ProductCardPrice_accent][data-qa$="_price"]') ||
-                 card.querySelector('[data-qa$="_price"]');
-    if (!priceEl) return;
+    // First try to get price per unit from volume text
+    const pricePerUnitInfo = parsePricePerUnit(volumeEl.textContent);
 
-    // Parse volume and price
-    const volumeInfo = parseAmount(volumeEl.textContent);
-    const price = parsePrice(priceEl.textContent);
+    if (pricePerUnitInfo) {
+        // Use the price per unit directly from the volume text
+        addPriceElement(card, pricePerUnitInfo.price, pricePerUnitInfo.unit);
+    } else {
+        // Calculate price per unit from product price and amount
+        const amountInfo = parseAmount(volumeEl.textContent);
+        if (!amountInfo) return;
 
-    if (!volumeInfo || !price) return;
+        // Find price element - first try discounted price, then regular price
+        const priceEl = card.querySelector('[class*=ProductCardPrice_accent][data-qa$="_price"]') ||
+                       card.querySelector('[data-qa$="_price"]');
+        if (!priceEl) return;
 
-    // Calculate price per unit
-    const pricePerUnit = price / volumeInfo.amount;
+        const price = parsePrice(priceEl.textContent);
+        if (!price) return;
 
-    // Create and add new price element
-    const newPriceEl = document.createElement('div');
-
-    newPriceEl.style.fontSize = '14px';
-    newPriceEl.style.color = '#666';
-    newPriceEl.style.paddingTop = 0;
-    newPriceEl.textContent = `${pricePerUnit.toFixed(2)} ₽/${volumeInfo.unit}`;
-
-    // Insert after price element
-    const priceWrapper = priceEl.closest('[class*=ProductCardPrice_price]');
-    if (priceWrapper) {
-        priceWrapper.parentNode.insertBefore(newPriceEl, priceWrapper.nextSibling);
+        // Calculate price per unit
+        const pricePerUnit = price / amountInfo.amount;
+        addPriceElement(card, pricePerUnit, amountInfo.unit);
     }
 
     // Mark card as processed
     card.setAttribute('data-price-per-unit-added', 'true');
+}
+
+// Helper function to add price element to card
+function addPriceElement(card, price, unit) {
+    const newPriceEl = document.createElement('div');
+    newPriceEl.style.fontSize = '14px';
+    newPriceEl.style.color = '#666';
+    newPriceEl.style.paddingTop = 0;
+    newPriceEl.textContent = `${price.toFixed(2)} ₽/${unit}`;
+
+    // Find price element to insert after
+    const priceEl = card.querySelector('[class*=ProductCardPrice_accent][data-qa$="_price"]') ||
+                   card.querySelector('[data-qa$="_price"]');
+    if (priceEl) {
+        const priceWrapper = priceEl.closest('[class*=ProductCardPrice_price]');
+        if (priceWrapper) {
+            priceWrapper.parentNode.insertBefore(newPriceEl, priceWrapper.nextSibling);
+        }
+    }
 }
 
 // Debounce function to limit how often we process cards
